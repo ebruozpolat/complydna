@@ -2,6 +2,8 @@
 
 > Why we build for less work, not more data.
 
+*Language: **English** · [Türkçe](./philosophy.tr.md)*
+
 This document states the conviction ComplyDNA is built on. Everything in
 [`complydna-dev-plan.md`](./complydna-dev-plan.md) — cite-first answers, killing
 redundant review work, versioned golden-set evals — follows from it. If a
