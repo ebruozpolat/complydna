@@ -11,21 +11,33 @@ catches the 402 and pays automatically with a testnet wallet.
   that calls the endpoint, catches the `402`, signs a USDC payment with a Base
   Sepolia test wallet, retries, and prints the result.
 
-Payments settle in **USDC on the Base Sepolia testnet**, so nothing here costs
+Everything targets **USDC on the Base Sepolia testnet**, so nothing here touches
 real money.
 
 ```
 buyer  ──GET /api/quote──▶  seller
        ◀──── 402 + payment requirements ────
 buyer  ─sign USDC payment (EIP-3009)─▶ retry with X-PAYMENT header
-                     seller ──verify+settle──▶ x402 facilitator ──▶ Base Sepolia
+                     seller ──verify+settle──▶ facilitator ──▶ Base Sepolia
        ◀──── 200 + JSON quote + settlement receipt ────
 ```
 
+## Two ways to run it
+
+| Mode | Facilitator | Funds needed | Use it for |
+| ---- | ----------- | ------------ | ---------- |
+| **Local demo** (default) | Bundled local facilitator (`seller/local-facilitator.ts`) | **None** | Seeing the full `402 → pay → 200` flow work instantly, offline. Verification/settlement are **simulated in-process — no real USDC moves.** |
+| **Real on-chain** | A real facilitator via `FACILITATOR_URL` | Test USDC in the buyer wallet | Actually moving test USDC on Base Sepolia. |
+
+The default is **local demo mode**, so `npm start` on both sides just works — no
+faucet, no wallet funding, no external network. Switch to real settlement by
+setting `FACILITATOR_URL` (see [Real on-chain settlement](#real-on-chain-settlement)).
+
 > **How does the buyer pay without gas?** With the x402 *exact* EVM scheme the
-> buyer only **signs** a USDC transfer authorization (EIP-3009). The facilitator
-> submits the on-chain transaction, so the buyer wallet needs **test USDC** but
-> generally **no ETH for gas**.
+> buyer only **signs** a USDC transfer authorization (EIP-3009) — the name,
+> version and amount all come from the seller's 402 response, so signing needs
+> no chain access. The facilitator submits the on-chain transaction, so even in
+> real mode the buyer wallet needs **test USDC** but generally **no ETH for gas**.
 
 ---
 
@@ -33,7 +45,28 @@ buyer  ─sign USDC payment (EIP-3009)─▶ retry with X-PAYMENT header
 
 - **Node.js 20+** (the run scripts use Node's built-in `--env-file`).
 - A Base Sepolia wallet address to **receive** payments (seller).
-- A Base Sepolia test wallet funded with **test USDC** to **make** payments (buyer).
+- For **real on-chain** mode only: a Base Sepolia test wallet funded with **test
+  USDC**. Local demo mode needs no funds.
+
+---
+
+## Quick start (local demo mode, no funds)
+
+```bash
+# Terminal A
+cd seller && npm install && cp .env.example .env
+#   → set ADDRESS in .env to any 0x address that should "receive" payments
+npm start
+
+# Terminal B
+cd buyer && npm install && npm run generate-wallet
+#   → copy PRIVATE_KEY into buyer/.env (cp .env.example .env first)
+npm start
+```
+
+You should see the buyer print a `200` JSON quote and a settlement receipt. No
+faucet needed. The sections below cover wallet creation, the faucet, and real
+on-chain settlement in more detail.
 
 ---
 
@@ -66,6 +99,9 @@ private key — just make sure it's a testnet-only account.
 ---
 
 ## 2. Fund the wallet with Base Sepolia test USDC
+
+> Only needed for **real on-chain** mode. In the default local demo mode you can
+> skip this entirely.
 
 1. Go to the **Circle USDC faucet**: <https://faucet.circle.com>
 2. Select network **Base Sepolia**.
@@ -171,7 +207,7 @@ app.use(
         network: "base-sepolia",
       },
     },
-    facilitator,                        // optional; defaults to the hosted testnet facilitator
+    { url: facilitatorUrl },            // local facilitator by default; real one via FACILITATOR_URL
   ),
 );
 ```
@@ -195,7 +231,7 @@ const response = await fetchWithPay(url, { method: "GET" }); // pays on 402, the
 | `ADDRESS`        | yes      | Wallet address that receives USDC payments.                                 |
 | `NETWORK`        | no       | Payment network. Default `base-sepolia`.                                    |
 | `PORT`           | no       | API port. Default `4021`.                                                    |
-| `FACILITATOR_URL`| no       | Override the x402 facilitator. Default = hosted testnet facilitator.        |
+| `FACILITATOR_URL`| no       | Real facilitator URL. **Unset = bundled local demo facilitator** (simulated settlement, no funds). |
 
 ### `buyer/.env`
 
@@ -203,6 +239,30 @@ const response = await fetchWithPay(url, { method: "GET" }); // pays on 402, the
 | -------------- | -------- | ------------------------------------------------------------------ |
 | `PRIVATE_KEY`  | yes      | Base Sepolia **test** wallet private key (`0x...`). Never mainnet. |
 | `RESOURCE_URL` | no       | Endpoint to call. Default `http://localhost:4021/api/quote`.       |
+
+---
+
+## Real on-chain settlement
+
+The default local facilitator (`seller/local-facilitator.ts`) *simulates*
+verification and settlement so the demo runs with no funds — **no USDC actually
+moves.** To settle real test USDC on Base Sepolia:
+
+1. Fund the buyer wallet with test USDC (see step 2).
+2. Point the seller at a real facilitator, e.g. in `seller/.env`:
+
+   ```bash
+   FACILITATOR_URL=https://x402.org/facilitator
+   ```
+
+   For the Coinbase CDP facilitator (mainnet or authenticated setups), use the
+   `facilitator` export from `@coinbase/x402` and its API keys — see the
+   [x402 docs](https://docs.x402.org).
+3. Restart the seller and run the buyer again. This time settlement broadcasts a
+   real `transferWithAuthorization` transaction and the `x-payment-response`
+   header carries the actual on-chain tx hash.
+
+Nothing else changes — the seller and buyer code is identical in both modes.
 
 ---
 

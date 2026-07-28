@@ -1,5 +1,6 @@
 import express from "express";
 import { paymentMiddleware, type Network } from "x402-express";
+import { localFacilitator } from "./local-facilitator.js";
 
 // ---------------------------------------------------------------------------
 // Config (from environment — see .env.example)
@@ -15,14 +16,23 @@ if (!payTo) {
   process.exit(1);
 }
 
-// Optional: point at a specific x402 facilitator. If FACILITATOR_URL is unset,
-// x402-express uses the default hosted testnet facilitator
-// (https://x402.org/facilitator), which verifies and settles USDC on Base Sepolia.
-const facilitator = process.env.FACILITATOR_URL
-  ? { url: process.env.FACILITATOR_URL as `${string}://${string}` }
-  : undefined;
-
 const app = express();
+
+// Facilitator selection:
+//   - FACILITATOR_URL set   → use that real facilitator (real on-chain USDC
+//                             settlement; buyer wallet must be funded).
+//   - FACILITATOR_URL unset → run the bundled LOCAL facilitator (default), so
+//                             the demo completes end-to-end with no funds and
+//                             no external network. See local-facilitator.ts.
+const externalFacilitatorUrl = process.env.FACILITATOR_URL;
+const useLocalFacilitator = !externalFacilitatorUrl;
+const facilitatorUrl = (
+  useLocalFacilitator ? `http://localhost:${port}/facilitator` : externalFacilitatorUrl
+) as `${string}://${string}`;
+
+if (useLocalFacilitator) {
+  app.use("/facilitator", localFacilitator());
+}
 
 // ---------------------------------------------------------------------------
 // x402 paywall: protect GET /api/quote.
@@ -43,7 +53,7 @@ app.use(
         },
       },
     },
-    facilitator,
+    { url: facilitatorUrl },
   ),
 );
 
@@ -66,4 +76,7 @@ app.listen(port, () => {
   console.log(`  paid endpoint : GET http://localhost:${port}/api/quote`);
   console.log(`  network       : ${network}`);
   console.log(`  paying to     : ${payTo}`);
+  console.log(
+    `  facilitator   : ${facilitatorUrl}${useLocalFacilitator ? " (local demo — simulated settlement)" : ""}`,
+  );
 });

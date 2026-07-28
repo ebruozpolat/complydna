@@ -1,6 +1,6 @@
 # Secrets — never commit private keys or env files
 .env
-.env.local
+.env.*
 *.env
 !.env.example
 
