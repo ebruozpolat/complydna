@@ -1,0 +1,23 @@
+# Secrets — never commit private keys or env files
+.env
+.env.local
+*.env
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

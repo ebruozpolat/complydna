@@ -1,0 +1,20 @@
+{
+  "name": "x402-buyer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal x402 buyer: calls a paid endpoint and pays automatically with x402-fetch.",
+  "scripts": {
+    "start": "tsx --env-file=.env index.ts",
+    "generate-wallet": "tsx generate-wallet.ts"
+  },
+  "dependencies": {
+    "viem": "^2.21.26",
+    "x402-fetch": "^1.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
